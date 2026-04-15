@@ -2,21 +2,81 @@ trigger:
 - main
 
 pool:
-  name: SelfHostedPool  # your self-hosted agent pool
+  name: SelfHostedPool
 
 stages:
+
+# ======================
+# BUILD STAGE
+# ======================
 - stage: Build
   jobs:
-  - job: BuildReactApp
+  - job: BuildApp
     steps:
 
     - task: NodeTool@0
       inputs:
         versionSpec: '18.x'
-      displayName: 'Install Node.js'
+      displayName: "Use Node.js"
 
     - script: npm install
-      displayName: 'Install dependencies'
+      displayName: "Install dependencies"
 
     - script: npm run build
-      displayName: 'Build React App'
+      displayName: "Build React app"
+
+
+# ======================
+# TEST STAGE
+# ======================
+- stage: Test
+  dependsOn: Build
+  jobs:
+  - job: TestApp
+    steps:
+
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '18.x'
+      displayName: "Use Node.js"
+
+    - script: npm install
+      displayName: "Install dependencies"
+
+    - script: npm test -- --watchAll=false --passWithNoTests
+      displayName: "Run tests"
+
+
+# ======================
+# DEPLOY STAGE
+# ======================
+- stage: Deploy
+  dependsOn: Test
+  jobs:
+  - job: DeployApp
+    steps:
+
+    # Copy build folder to VM
+    - task: CopyFilesOverSSH@0
+      inputs:
+        sshEndpoint: 'ubuntu-ssh-connection'
+        sourceFolder: '$(System.DefaultWorkingDirectory)/build'
+        contents: '**'
+        targetFolder: '/tmp/react-build'
+      displayName: "Copy build to server"
+
+    # Execute deployment commands on VM
+    - task: SSH@0
+      inputs:
+        sshEndpoint: 'ubuntu-ssh-connection'
+        runOptions: 'commands'
+        commands: |
+          echo "Starting deployment..."
+
+          sudo rm -rf /var/www/html/*
+          sudo cp -r /tmp/react-build/* /var/www/html/
+
+          sudo systemctl restart nginx
+
+          echo "Deployment complete."
+      displayName: "Deploy to Nginx"
