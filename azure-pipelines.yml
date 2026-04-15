@@ -2,7 +2,7 @@ trigger:
 - main
 
 pool:
-  name: Default  # your self-hosted agent pool
+  name: SelfHostedPool  # your self-hosted agent pool
 
 stages:
 - stage: Build
