@@ -4,11 +4,11 @@ trigger:
 pool:
   name: SelfHostedPool
 
-stages:
-
 # ======================
 # BUILD STAGE
 # ======================
+stages:
+
 - stage: Build
   jobs:
   - job: BuildApp
@@ -19,11 +19,19 @@ stages:
         versionSpec: '18.x'
       displayName: "Use Node.js"
 
-    - script: npm install
+    - script: npm install --no-audit --no-fund
       displayName: "Install dependencies"
 
     - script: npm run build
       displayName: "Build React app"
+
+    # 🔥 FIX: publish build output properly
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'build'
+        ArtifactName: 'react-build'
+        publishLocation: 'Container'
+      displayName: "Publish Build Artifact"
 
 
 # ======================
@@ -40,7 +48,7 @@ stages:
         versionSpec: '18.x'
       displayName: "Use Node.js"
 
-    - script: npm install
+    - script: npm install --no-audit --no-fund
       displayName: "Install dependencies"
 
     - script: npm test -- --watchAll=false --passWithNoTests
@@ -56,16 +64,25 @@ stages:
   - job: DeployApp
     steps:
 
+    # 🔥 FIX: download artifact instead of assuming local build folder
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        buildType: 'current'
+        downloadType: 'single'
+        artifactName: 'react-build'
+        downloadPath: '$(Pipeline.Workspace)'
+      displayName: "Download Build Artifact"
+
     # Copy build folder to VM
     - task: CopyFilesOverSSH@0
       inputs:
         sshEndpoint: 'ubuntu-ssh-connection'
-        sourceFolder: '$(System.DefaultWorkingDirectory)/build'
+        sourceFolder: '$(Pipeline.Workspace)/react-build'
         contents: '**'
         targetFolder: '/tmp/react-build'
       displayName: "Copy build to server"
 
-    # Execute deployment commands on VM
+    # Deploy on server
     - task: SSH@0
       inputs:
         sshEndpoint: 'ubuntu-ssh-connection'
