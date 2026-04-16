@@ -79,10 +79,12 @@ stages:
         downloadPath: '$(Pipeline.Workspace)'
       displayName: "Download Build Artifact"
 
-    # Copy files using SCP (password-based)
+    # Prepare directory + Copy files
     - script: |
+        sshpass -p 'Pass1234!' ssh -o StrictHostKeyChecking=no ubuntu@35.173.184.135 "mkdir -p /tmp/react-build"
+
         sshpass -p 'Pass1234!' scp -o StrictHostKeyChecking=no -r $(Pipeline.Workspace)/react-build/* ubuntu@35.173.184.135:/tmp/react-build
-      displayName: "Copy files via SCP"
+      displayName: "Prepare and Copy files via SCP"
 
     # Deploy on server
     - script: |
