@@ -64,7 +64,13 @@ stages:
   - job: DeployApp
     steps:
 
-    # 🔥 FIX: download artifact instead of assuming local build folder
+    # Install sshpass
+    - script: |
+        sudo apt-get update
+        sudo apt-get install -y sshpass
+      displayName: "Install sshpass"
+
+    # Download artifact
     - task: DownloadBuildArtifacts@0
       inputs:
         buildType: 'current'
@@ -73,27 +79,16 @@ stages:
         downloadPath: '$(Pipeline.Workspace)'
       displayName: "Download Build Artifact"
 
-    # Copy build folder to VM
-    - task: CopyFilesOverSSH@0
-      inputs:
-        sshEndpoint: 'ubuntu-ssh-connection'
-        sourceFolder: '$(Pipeline.Workspace)/react-build'
-        contents: '**'
-        targetFolder: '/tmp/react-build'
-      displayName: "Copy build to server"
+    # Copy files using SCP (password-based)
+    - script: |
+        sshpass -p 'Pass1234!' scp -o StrictHostKeyChecking=no -r $(Pipeline.Workspace)/react-build/* ubuntu@35.173.184.135:/tmp/react-build
+      displayName: "Copy files via SCP"
 
     # Deploy on server
-    - task: SSH@0
-      inputs:
-        sshEndpoint: 'ubuntu-ssh-connection'
-        runOptions: 'commands'
-        commands: |
-          echo "Starting deployment..."
-
-          sudo rm -rf /var/www/html/*
-          sudo cp -r /tmp/react-build/* /var/www/html/
-
+    - script: |
+        sshpass -p 'Pass1234!' ssh -o StrictHostKeyChecking=no ubuntu@35.173.184.135 "
+          sudo rm -rf /var/www/html/* &&
+          sudo cp -r /tmp/react-build/* /var/www/html/ &&
           sudo systemctl restart nginx
-
-          echo "Deployment complete."
-      displayName: "Deploy to Nginx"
+        "
+      displayName: "Deploy via SSH"
